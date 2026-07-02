@@ -1,0 +1,36 @@
+{
+    "name": "folioflow",
+    "type": "commonjs",
+    "version": "1.0.0",
+    "description": "folio managment based on momentum strategy develop by alok jain",
+    "author": "",
+    "license": "ISC",
+    "main": "index.js",
+    "bin": {
+        "folioflow": "bin/folioflow.js"
+    },
+    "files": [
+        "README.md",
+        "bin",
+        "index.js",
+        "package.json",
+        "src"
+    ],
+    "scripts": {
+        "test": "jest",
+        "start": "node bin/folioflow.js"
+    },
+    "dependencies": {
+        "chalk": "^4.1.2",
+        "debug": "^4.4.3",
+        "technicalindicators": "^3.1.0",
+        "xlsx": "^0.18.5",
+        "yahoo-finance2": "^3.15.3",
+        "yargs": "^18.0.0"
+    },
+    "devDependencies": {
+        "@antfu/eslint-config": "^9.0.0",
+        "eslint": "^10.6.0",
+        "jest": "^30.4.2"
+    }
+}
