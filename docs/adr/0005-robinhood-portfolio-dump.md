@@ -1,8 +1,8 @@
 # ADR-0005: Robinhood portfolio dump via the unofficial private API
 
-- Status: Accepted
+- Status: **Deprecated** (rejected by ADR-0008 — integration removed)
 - Date: 2026-07-01
-- Context: FolioFlow — new `dump-rh` subcommand
+- Context: FolioFlow — `dump-rh` subcommand (REMOVED — see ADR-0008)
 
 ## Context
 
@@ -34,6 +34,10 @@ Negative / acknowledged risks:
 - **Fragility.** Robinhood can rotate endpoints, change auth, or roll out new anti-automation measures at any time. When they do, this feature breaks until the adapter is updated. There is no support contract to lean on.
 - **Credential handling.** We take credentials as input. Even with our "never log, never persist" rules, the credentials pass through process memory and argv. This is a real security posture change from the rest of FolioFlow, which has *no* credentials at all.
 - **No retry, no backoff.** Robinhood's anti-abuse signal on this surface is much higher than Yahoo Finance's. A single 429 on the login endpoint kills the run; we do not retry. The Trader re-runs.
+
+## Superseded in part
+
+The at-rest encryption of the device token, the refresh-token flow, and the new typed error classes (`RobinhoodRateLimitError`, `RobinhoodSchemaError`, `RobinhoodTokenStoreError`) are documented in [`docs/adr/0006-encrypted-device-token-pair.md`](./0006-encrypted-device-token-pair.md). This ADR is the canonical high-level rationale for the feature; ADR-0006 is the canonical rationale for the encryption and refresh follow-up.
 
 ## Alternatives considered
 

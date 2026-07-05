@@ -1,11 +1,9 @@
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 
 const PROJECT_ROOT = __dirname
 const snp500Path = path.join(PROJECT_ROOT, 'snp500.json')
 const resultsPath = path.join(PROJECT_ROOT, 'spy_rsi_results.json')
-const rhTokenPath = path.join(os.homedir(), '.folioflow', 'robinhood_device_token')
 
 jest.mock('./src/infrastructure/YahooFinanceAdapter', () => {
     return jest.fn().mockImplementation(() => ({
@@ -24,16 +22,6 @@ jest.mock('./src/infrastructure/SPYHoldingsAdapter', () => {
 const { execFileSync } = require('node:child_process')
 
 const INDEX_JS = path.join(PROJECT_ROOT, 'index.js')
-
-function cleanRobinhoodToken() {
-    try {
-        fs.unlinkSync(rhTokenPath)
-    }
-    catch (err) {
-        if (err.code !== 'ENOENT')
-            throw err
-    }
-}
 
 function runCli(args) {
     try {
@@ -56,19 +44,13 @@ function runCli(args) {
 
 describe('cLI integration — parsing & error surfaces (spawn index.js)', () => {
     describe('--help', () => {
-        it('exits 0 and lists all three subcommands', () => {
+        it('exits 0 and lists all subcommands', () => {
             const result = runCli(['--help'])
             expect(result.code).toBe(0)
             expect(result.stdout).toMatch(/folioflow/)
             expect(result.stdout).toMatch(/rsi <symbol>/)
             expect(result.stdout).toMatch(/sync-spy/)
             expect(result.stdout).toMatch(/batch-spy/)
-        })
-
-        it('lists the dump-rh subcommand', () => {
-            const result = runCli(['--help'])
-            expect(result.code).toBe(0)
-            expect(result.stdout).toMatch(/dump-rh/)
         })
     })
 
@@ -113,25 +95,6 @@ describe('cLI integration — parsing & error surfaces (spawn index.js)', () => 
     describe('unknown command', () => {
         it('exits non-zero', () => {
             const result = runCli(['definitely-not-a-command'])
-            expect(result.code).not.toBe(0)
-            expect(result.stderr).toMatch(/Error:/)
-        })
-    })
-
-    describe('dump-rh subcommand', () => {
-        beforeEach(() => {
-            cleanRobinhoodToken()
-            if (fs.existsSync(path.join(PROJECT_ROOT, 'robinhood_portfolio.json')))
-                fs.unlinkSync(path.join(PROJECT_ROOT, 'robinhood_portfolio.json'))
-        })
-        afterEach(() => {
-            cleanRobinhoodToken()
-            if (fs.existsSync(path.join(PROJECT_ROOT, 'robinhood_portfolio.json')))
-                fs.unlinkSync(path.join(PROJECT_ROOT, 'robinhood_portfolio.json'))
-        })
-
-        it('exits non-zero with a red Error: line on stderr when the adapter is missing', () => {
-            const result = runCli(['dump-rh'])
             expect(result.code).not.toBe(0)
             expect(result.stderr).toMatch(/Error:/)
         })

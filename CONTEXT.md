@@ -39,20 +39,37 @@ This module is a single bounded context. The four internal layers (Presentation,
 - **Yahoo Finance** — The external data provider for Historical Prices. Adapter-wrapped; the domain does not name it.
 - **State Street** — The publisher of the SPY Holdings spreadsheet. Adapter-wrapped; the domain does not name it.
 - **Wilder's smoothing** — The smoothing method the upstream `technicalindicators` library uses for RSI. We do not redefine it; we consume it as-is.
-- **Robinhood** — A retail brokerage. Adapter-wrapped; the domain does not name it. FolioFlow does not name its endpoints, libraries, or auth protocol.
 
-## Robinhood portfolio dump
+## Trader Portfolio
 
-- **Robinhood Portfolio** — The Trader's current set of open stock/ETF positions at one broker, surfaced as a stable, FolioFlow-shaped JSON record. Always refers to the *current* state, never history.
-- **Position** — A single open lot in the Robinhood Portfolio. Carries: Symbol, quantity, average buy price, current market price, market value, and unrealised P/L (absolute and percent).
-- **Portfolio Dump** — The act of fetching the Robinhood Portfolio once and serialising it to `robinhood_portfolio.json` in the current working directory. Always replaces the file (no append, no merge).
-- **Robinhood Credentials** — The Trader's Robinhood username and password. Accepted by the system; never logged, never echoed, never written to disk in plaintext.
-- **Device Token** — A persisted authentication artefact obtained after the first successful Robinhood login, including any MFA challenge. Stored on disk so subsequent Portfolio Dumps do not require a fresh login. Belongs to a single Trader on a single machine.
-- **MFA Challenge** — An out-of-band code (SMS or authenticator) that Robinhood may require on the first Portfolio Dump from a new device. The Trader supplies the code; FolioFlow does not generate or intercept it.
+- **Trader Portfolio** — A JSON document the Trader provides to FolioFlow describing their own current holdings, independent of any broker. One object per holding. Carries the six canonical fields (Name, Symbol, Shares, Price, Average cost, Total return, Equity attribute). May be hand-edited by the Trader.
+- **Equity Attribute** — A user-supplied tag on a Trader Portfolio row classifying the instrument by type (e.g. `stock`, `etf`, `option`, `crypto`). The `plan` subcommand can use this to filter buy/sell signals by type.
+- **Plan Signal** — A buy, sell, or hold verdict produced for one row of a Trader Portfolio. Computed by the `plan` subcommand against the S&P 500 top-20 set; each signal carries a `reason` string explaining the verdict.
+- **Top-20 Set** — The first 20 tickers in `snp500.json` (the S&P 500 constituent list, ordered as State Street publishes them). Used by `plan` as the reference set for "is this holding a top-tier S&P 500 name?". A holding *not* in the top-20 set is a candidate buy; a holding *in* the top-20 set with negative `Total return` is a candidate sell.
 
-## Application services (use cases) — updated
+## Application services (use cases)
 
 - **GetStockRSIs** — Given one Symbol, return that Symbol's RSI Result. Always fetches its own Historical Prices.
 - **SyncSPYHoldings** — Refresh `snp500.json` from the current SPY Holdings.
 - **BatchCalculateRSIs** — Given a list of Symbols, return an RSI Result for each in order, applying the Rate-Limited Window between fetches.
-- **DumpRobinhoodPortfolio** — Authenticate against Robinhood (using Robinhood Credentials or a stored Device Token), fetch the current Positions, and serialise them to `robinhood_portfolio.json`.
+- **GeneratePortfolioPlan** — Given a Trader Portfolio (an array of rows) and the S&P 500 top-20 set, augment each row with a Plan Signal and a reason string.
+
+## Archived (Removed)
+
+The terms below were part of FolioFlow's ubiquitous language when the `dump-rh` subcommand shipped. They are preserved here so returning contributors can find the historical context. They are **not** part of the active glossary; the integration they describe no longer exists in the codebase. See `docs/adr/0008-remove-robinhood-integration.md` for the removal decision.
+
+- **Robinhood** — A retail brokerage. The removed integration hit `api.robinhood.com`, an undocumented private API. The domain did not name its endpoints, libraries, or auth protocol.
+- **Robinhood Portfolio** — The Trader's current set of open stock/ETF positions at one broker, surfaced as a stable, FolioFlow-shaped JSON record. Always referred to the *current* state, never history.
+- **Position** — A single open lot in the Robinhood Portfolio. Carried: Symbol, quantity, average buy price, current market price, market value, and unrealised P/L (absolute and percent).
+- **Portfolio Dump** — The act of fetching the Robinhood Portfolio once and serialising it to `robinhood_portfolio.json` in the current working directory. Always replaced the file (no append, no merge).
+- **Robinhood Credentials** — The Trader's Robinhood username and password. Accepted by the system; never logged, never echoed, never written to disk in plaintext.
+- **Access Token** — The short-lived bearer credential (typically hours) used in the `Authorization: Bearer …` header on every authenticated Robinhood request. Obtained from `/oauth2/migrate_token/` after a successful classic login, then refreshed via `/oauth2/token/` with `grant_type=refresh_token`. Never persisted on its own; lived only in process memory for the duration of one Portfolio Dump.
+- **Device Token Pair** — The persisted, password-derived-key-encrypted JSON object written to `~/.folioflow/robinhood_device_token` after the first successful Robinhood login. Shape (canonical):
+  ```json
+  { "v": 1, "access_token": "...", "refresh_token": "...", "issued_at": "...", "expires_in": 86400 }
+  ```
+  Contained both the Access Token and a longer-lived Refresh Token. Belonged to a single Trader on a single machine. The on-disk file was useless without the Trader's password. Replaced atomically on every successful refresh; deleted on refresh-token revocation.
+- **Refresh Token** — The longer-lived credential (typically ~30 days) used to mint a new Access Token without re-prompting the Trader. Lived only inside the Device Token Pair. Rotated on every successful refresh.
+- **MFA Challenge** — An out-of-band code (SMS or authenticator) that Robinhood could require on the first Portfolio Dump from a new device. The Trader supplied the code; FolioFlow did not generate or intercept it.
+- **Robinhood Rate Limit** — A 429 response from `api.robinhood.com` indicating the Trader's IP had exceeded Robinhood's per-window request threshold. Distinct from an auth error: the credentials were still valid, the request was not. Surfaced as a `RobinhoodRateLimitError`.
+- **DumpRobinhoodPortfolio** — Authenticated against Robinhood (using Robinhood Credentials or a stored Device Token), fetched the current Positions, and serialised them to `robinhood_portfolio.json`. Removed in `prd-md/remove-robinhood-prd.md`.
