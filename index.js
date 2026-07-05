@@ -1,16 +1,14 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const BatchCalculateRSIs = require('./src/application/BatchCalculateRSIs')
-const DumpRobinhoodPortfolio = require('./src/application/DumpRobinhoodPortfolio')
+const { GeneratePortfolioPlan } = require('./src/application/GeneratePortfolioPlan.js')
 const GetStockRSIs = require('./src/application/GetStockRSIs')
 const {
     FolioFlowError,
     InvalidSymbolError,
     AdapterError,
     MissingHoldingsError,
-    RobinhoodAuthError,
 } = require('./src/errors')
-const RobinhoodAdapter = require('./src/infrastructure/RobinhoodAdapter')
 const SPYHoldingsAdapter = require('./src/infrastructure/SPYHoldingsAdapter')
 const YahooFinanceAdapter = require('./src/infrastructure/YahooFinanceAdapter')
 
@@ -21,7 +19,6 @@ class FolioFlow {
         this.adapters = {
             yahooFinance: adapters.yahooFinance || new YahooFinanceAdapter(),
             spyHoldings: adapters.spyHoldings || new SPYHoldingsAdapter(),
-            robinhood: adapters.robinhood === undefined ? new RobinhoodAdapter() : adapters.robinhood,
         }
     }
 
@@ -55,12 +52,19 @@ class FolioFlow {
         return batchService.execute(tickers)
     }
 
-    async dumpRobinhoodPortfolio(credentials = {}) {
-        if (!this.adapters.robinhood) {
-            throw new RobinhoodAuthError('Robinhood adapter is not configured.')
-        }
-        const service = new DumpRobinhoodPortfolio(this.adapters.robinhood)
-        return service.execute(credentials)
+    async planPortfolio(rows, options = {}) {
+        const getTop20 = options.getTop20 || (() => {
+            if (options.top20)
+                return options.top20
+            const snp500Path = path.join(process.cwd(), 'snp500.json')
+            if (!fs.existsSync(snp500Path)) {
+                throw new MissingHoldingsError('snp500.json not found. Run syncSPYHoldings() first.')
+            }
+            const list = JSON.parse(fs.readFileSync(snp500Path, 'utf8'))
+            return Array.isArray(list) ? list.slice(0, 20) : []
+        })
+        const service = new GeneratePortfolioPlan(getTop20)
+        return service.execute(rows)
     }
 }
 
@@ -69,7 +73,6 @@ FolioFlow.FolioFlowError = FolioFlowError
 FolioFlow.InvalidSymbolError = InvalidSymbolError
 FolioFlow.AdapterError = AdapterError
 FolioFlow.MissingHoldingsError = MissingHoldingsError
-FolioFlow.RobinhoodAuthError = RobinhoodAuthError
 
 module.exports = FolioFlow
 module.exports.FolioFlow = FolioFlow
@@ -79,7 +82,6 @@ module.exports.FolioFlowError = FolioFlowError
 module.exports.InvalidSymbolError = InvalidSymbolError
 module.exports.AdapterError = AdapterError
 module.exports.MissingHoldingsError = MissingHoldingsError
-module.exports.RobinhoodAuthError = RobinhoodAuthError
 
 if (require.main === module) {
     require('./bin/folioflow.js')

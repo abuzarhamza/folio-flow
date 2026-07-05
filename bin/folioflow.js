@@ -27,8 +27,12 @@ const parser = yargs(hideBin(process.argv))
         chalk.cyan('Calculate RSI for every ticker in snp500.json → spy_rsi_results.json.'),
     )
     .command(
-        'dump-rh',
-        chalk.cyan('Dump the current Robinhood portfolio to robinhood_portfolio.json.'),
+        'plan <file>',
+        chalk.cyan('Generate a portfolio plan from a JSON input file. See docs/example-portfolio.json for a worked example.'),
+        y => y.positional('file', {
+            type: 'string',
+            describe: 'Path to a Trader Portfolio JSON file',
+        }),
     )
     .demandCommand(1, chalk.red('Error: a subcommand is required.'))
     .option('pretty', {

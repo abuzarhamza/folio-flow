@@ -2,6 +2,8 @@
 
 FolioFlow is a specialized Command Line Interface (CLI) application built out of a strict Domain-Driven Design (DDD) architecture. It automates the retrieval of historical pricing and the calculation of the Relative Strength Index (RSI) across distinct time-horizons (22, 44, and 66 periods). Designed specifically to support quantitative momentum analysis, the system targets both individual stock evaluation and broad S&P 500 batch operations.
 
+> FolioFlow is a mechanical analysis tool. It does not provide financial advice.
+
 ## Features
 
 - **Multi-Period RSI Calculation**: Instantly computes RSI(22), RSI(44), and RSI(66) using the `technicalindicators` library driven by Yahoo Finance (`yahoo-finance2`).
@@ -55,16 +57,6 @@ const ff = new FolioFlow();
     // Batch RSI over a list of tickers
     const results = await ff.runBatchRSIs(['AAPL', 'MSFT', 'GOOG'])
     // => [{ symbol, rsi_22, rsi_44, rsi_66, rsi_avg }, ...]
-
-    // Robinhood portfolio dump (returns the array; the CLI writes the file)
-    // On the first run the use case needs a username and password; subsequent
-    // runs reuse a cached device token at ~/.folioflow/robinhood_device_token.
-    const positions = await ff.dumpRobinhoodPortfolio({
-        username: process.env.ROBINHOOD_USERNAME,
-        password: process.env.ROBINHOOD_PASSWORD,
-    })
-    // => [{ symbol, quantity, average_buy_price, current_price,
-    //      market_value, unrealised_pl, unrealised_pl_pct }, ...]
 })()
 ```
 
@@ -77,24 +69,9 @@ const mockYahoo = {
     getHistoricalPrices: async () => [/* fixture prices */],
 }
 const ff = new FolioFlow({ yahooFinance: mockYahoo })
-
-// Inject a mock Robinhood adapter to test dumpRobinhoodPortfolio offline.
-// The adapter must expose login({ username, password, mfaCode? }) and
-// fetchPositions(token). The use case normalises the response into the
-// FolioFlow-owned Position shape — your mock should return raw Robinhood
-// JSON; the use case handles the field mapping.
-const mockRobinhood = {
-    login: async () => 'FAKE-DEVICE-TOKEN',
-    fetchPositions: async () => ([
-        { symbol: 'AAPL', quantity: '12', average_buy_price: '178.42', current_price: '191.05', market_value: '2292.60', unrealised_pl: '151.56' },
-    ]),
-}
-const ff2 = new FolioFlow({ robinhood: mockRobinhood })
-const positions = await ff2.dumpRobinhoodPortfolio({ username: 'u', password: 'p' })
-// positions[0] has the canonical 7-key Position shape
 ```
 
-Errors are thrown as `Error` subclasses — `InvalidSymbolError`, `AdapterError`, `MissingHoldingsError`, `RobinhoodAuthError` — all extending `FolioFlowError`. Catch them with `instanceof`.
+Errors are thrown as `Error` subclasses — `InvalidSymbolError`, `AdapterError`, `MissingHoldingsError` — all extending `FolioFlowError`. Catch them with `instanceof`.
 
 The package version is exposed as `FolioFlow.version` (and as the named export `version`).
 
@@ -129,33 +106,97 @@ Executes the heavy chronological execution pipeline. This operation utilizes fix
 node index.js --batch-spy
 ```
 
-### 4. Robinhood Portfolio Dump
-Authenticates against Robinhood on the Trader's behalf and writes the current open stock/ETF positions to `robinhood_portfolio.json` in the working directory. The first run prompts for username and password (and an MFA code if challenged); subsequent runs reuse a cached device token at `~/.folioflow/robinhood_portfolio.json` and are non-interactive.
+### 4. Portfolio Plan
+Takes a JSON file describing the Trader's current portfolio and augments each row with a `signal` (buy / sell / hold) and a `reason` string, based on a momentum-based top-20 rule against the S&P 500.
+
+> Plan signals are a mechanical rule, not financial advice. Consult a licensed advisor before acting on them.
+
+**Rule (v1)**:
+- Buy if not in the S&P 500 top-20 set.
+- Sell if in the top-20 set and `Total return` is strictly negative.
+- Hold otherwise.
+
+*(Note: Requires `--sync-spy` to be run at least once prior so that `snp500.json` exists in the working directory.)*
+
 ```bash
-node index.js dump-rh
+node index.js plan my_portfolio.json
 ```
+
+**Input Shape (`my_portfolio.json`)**:
+A plain JSON array of objects with English-cased field names.
+
+A complete 4-row worked example ships with the package at `docs/example-portfolio.json` — copy it (and the sibling NOTICE) to start:
+```bash
+cp docs/example-portfolio.json my_portfolio.json
+cp docs/example-portfolio.NOTICE.txt my_portfolio.NOTICE.txt
+# Read my_portfolio.NOTICE.txt before editing the JSON.
+```
+
+The same content, inline:
+```json
+[
+    {
+        "Name": "Apple Inc.",
+        "Symbol": "AAPL",
+        "Shares": 12,
+        "Price": 191.05,
+        "Average cost": 178.42,
+        "Total return": 151.56,
+        "Equity attribute": "stock"
+    },
+    {
+        "Name": "Microsoft Corp.",
+        "Symbol": "MSFT",
+        "Shares": 8,
+        "Price": 410.20,
+        "Average cost": 435.20,
+        "Total return": -200.00,
+        "Equity attribute": "stock"
+    },
+    {
+        "Name": "Alphabet Inc.",
+        "Symbol": "GOOGL",
+        "Shares": 5,
+        "Price": 178.50,
+        "Average cost": 168.50,
+        "Total return": 50.00,
+        "Equity attribute": "stock"
+    },
+    {
+        "Name": "Burlington Stores",
+        "Symbol": "BURL",
+        "Shares": 2,
+        "Price": 245.00,
+        "Average cost": 230.00,
+        "Total return": 30.00,
+        "Equity attribute": "etf"
+    }
+]
+```
+
+The four rows above cover all three signal branches: `AAPL` and `GOOGL` are in the S&P 500 top-20 with non-negative returns (`hold`), `MSFT` is in the top-20 with a negative return (`sell`), and `BURL` is outside the top-20 (`buy`). Prices and returns are realistic but not real-time quotes — the example teaches the *shape*, not the market.
+
 **Output (`stdout`)**:
 ```json
-{ "status": "success", "positionsCount": 3, "file": "robinhood_portfolio.json" }
+{ "status": "success", "rowCount": 1, "signalCounts": { "buy": 0, "sell": 0, "hold": 1 }, "file": "plan.json" }
 ```
-**Output file (`./robinhood_portfolio.json`)**:
+
+**Output file (`./plan.json`)**:
 ```json
-{
-    "asOf": "2026-07-01T19:00:00.000Z",
-    "positions": [
-        {
-            "symbol": "AAPL",
-            "quantity": 12,
-            "average_buy_price": 178.42,
-            "current_price": 191.05,
-            "market_value": 2292.60,
-            "unrealised_pl": 151.56,
-            "unrealised_pl_pct": 7.08
-        }
-    ]
-}
+[
+    {
+        "Name": "Apple Inc.",
+        "Symbol": "AAPL",
+        "Shares": 12,
+        "Price": 191.05,
+        "Average cost": 178.42,
+        "Total return": 151.56,
+        "Equity attribute": "stock",
+        "signal": "hold",
+        "reason": "Symbol is in the S&P 500 top-20 set with non-negative total return"
+    }
+]
 ```
-*Note: This subcommand authenticates against Robinhood's private, undocumented API. Use at your own risk; account restrictions are possible. See `docs/adr/0005-robinhood-portfolio-dump.md` for the rationale.*
 
 ### Tracking & Debugging (Opt-in Tracing)
 

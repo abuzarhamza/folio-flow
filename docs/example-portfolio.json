@@ -1,0 +1,38 @@
+[
+    {
+        "Name": "Apple Inc.",
+        "Symbol": "AAPL",
+        "Shares": 12,
+        "Price": 191.05,
+        "Average cost": 178.42,
+        "Total return": 151.56,
+        "Equity attribute": "stock"
+    },
+    {
+        "Name": "Microsoft Corp.",
+        "Symbol": "MSFT",
+        "Shares": 8,
+        "Price": 410.20,
+        "Average cost": 435.20,
+        "Total return": -200.00,
+        "Equity attribute": "stock"
+    },
+    {
+        "Name": "Alphabet Inc.",
+        "Symbol": "GOOGL",
+        "Shares": 5,
+        "Price": 178.50,
+        "Average cost": 168.50,
+        "Total return": 50.00,
+        "Equity attribute": "stock"
+    },
+    {
+        "Name": "Burlington Stores",
+        "Symbol": "BURL",
+        "Shares": 2,
+        "Price": 245.00,
+        "Average cost": 230.00,
+        "Total return": 30.00,
+        "Equity attribute": "etf"
+    }
+]

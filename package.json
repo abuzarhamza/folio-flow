@@ -3,7 +3,7 @@
     "type": "commonjs",
     "version": "1.0.0",
     "description": "folio managment based on momentum strategy develop by alok jain",
-    "author": "",
+    "author": "abuzar hamza",
     "license": "ISC",
     "main": "index.js",
     "bin": {
@@ -12,13 +12,16 @@
     "files": [
         "README.md",
         "bin",
+        "docs/example-portfolio.json",
         "index.js",
         "package.json",
         "src"
     ],
     "scripts": {
         "test": "jest",
-        "start": "node bin/folioflow.js"
+        "start": "node bin/folioflow.js",
+        "lint": "eslint .",
+        "lint:fix": "eslint . --fix"
     },
     "dependencies": {
         "chalk": "^4.1.2",

@@ -8,12 +8,10 @@ class FolioFlowError extends Error {
 class InvalidSymbolError extends FolioFlowError {}
 class AdapterError extends FolioFlowError {}
 class MissingHoldingsError extends FolioFlowError {}
-class RobinhoodAuthError extends FolioFlowError {}
 
 module.exports = {
     FolioFlowError,
     InvalidSymbolError,
     AdapterError,
     MissingHoldingsError,
-    RobinhoodAuthError,
 }
