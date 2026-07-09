@@ -35,6 +35,6 @@ export default antfu(
     },
     {
         // Auto-managed by CommandCode; do not lint.
-        ignores: ['.commandcode/**'],
+        ignores: ['.commandcode/**', 'prd-md/**'],
     },
 )

@@ -3,6 +3,7 @@ const path = require('node:path')
 const debug = require('debug')('folioflow:cli')
 const FolioFlow = require('..')
 const { FolioFlowError } = require('..')
+const { SearchResults } = require('./application/SearchResults')
 
 const PLAN_DISCLAIMER = 'Plan signals are a mechanical rule, not financial advice. Consult a licensed advisor before acting on them.'
 
@@ -49,20 +50,13 @@ async function runBatchSPY(argv) {
     const symbols = JSON.parse(fs.readFileSync('snp500.json', 'utf8'))
     debug(`Parsed ${symbols.length} symbols targeting batch pipeline`)
 
-    console.log(
-        prettyJson(
-            {
-                status: 'processing',
-                message: `Processing ${symbols.length} stocks. This will take approx ${symbols.length} seconds.`,
-            },
-            argv,
-        ),
-    )
-
     const ff = new FolioFlow()
     const results = await ff.runBatchRSIs(symbols)
 
-    fs.writeFileSync('spy_rsi_results.json', JSON.stringify(results, null, 2))
+    fs.writeFileSync(
+        'spy_rsi_results.json',
+        JSON.stringify({ generated_at: new Date().toISOString(), tickers: results }, null, 2),
+    )
     debug('Results buffer fully dumped to spy_rsi_results.json')
     console.log(
         prettyJson(
@@ -74,6 +68,39 @@ async function runBatchSPY(argv) {
             argv,
         ),
     )
+}
+
+async function runSearch(argv) {
+    debug('Initiating results-file search')
+    const resultsPath = path.join(process.cwd(), 'spy_rsi_results.json')
+    if (!fs.existsSync(resultsPath)) {
+        throw new FolioFlowError('spy_rsi_results.json not found. Run `folioflow batch-spy` first.')
+    }
+    const raw = fs.readFileSync(resultsPath, 'utf8')
+    let data
+    try {
+        data = JSON.parse(raw)
+    }
+    catch {
+        throw new FolioFlowError('spy_rsi_results.json is not valid JSON.')
+    }
+    if (!data || typeof data !== 'object' || !Array.isArray(data.tickers)) {
+        throw new FolioFlowError('spy_rsi_results.json has an unexpected shape (expected { generated_at, tickers: [...] }).')
+    }
+
+    const hasSymbol = typeof argv.symbol === 'string' && argv.symbol.length > 0
+    const hasTop = typeof argv.top === 'number'
+    if (!hasSymbol && !hasTop) {
+        throw new FolioFlowError('search requires a <symbol> argument or the --top flag. Run `folioflow search --help` for usage.')
+    }
+
+    const service = new SearchResults(() => data)
+    const tickers = hasTop
+        ? service.topByRsiAvg(argv.top)
+        : service.findBySymbol(argv.symbol)
+
+    const output = { generated_at: data.generated_at, tickers: Array.isArray(tickers) ? tickers : [tickers] }
+    console.log(prettyJson(output, argv))
 }
 
 async function runPlan(argv, options = {}) {
@@ -132,7 +159,9 @@ async function run(argv, options = {}) {
             case 'batch-spy':
                 await runBatchSPY(argv)
                 break
-
+            case 'search':
+                await runSearch(argv)
+                break
             case 'plan':
                 await runPlan(argv, options)
                 break
@@ -150,4 +179,4 @@ async function run(argv, options = {}) {
     }
 }
 
-module.exports = { run, runRSI, runSyncSPY, runBatchSPY, runPlan }
+module.exports = { run, runRSI, runSyncSPY, runBatchSPY, runSearch, runPlan }

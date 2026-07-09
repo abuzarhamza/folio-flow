@@ -6,9 +6,14 @@ const snp500Path = path.join(PROJECT_ROOT, 'snp500.json')
 const resultsPath = path.join(PROJECT_ROOT, 'spy_rsi_results.json')
 
 jest.mock('./src/infrastructure/YahooFinanceAdapter', () => {
+    const base = new Date('2025-01-01').getTime()
+    const oneDay = 24 * 60 * 60 * 1000
     return jest.fn().mockImplementation(() => ({
         getHistoricalPrices: jest.fn().mockResolvedValue(
-            Array.from({ length: 200 }, (_, i) => 100 + Math.sin(i / 5) * 10),
+            Array.from({ length: 200 }, (_, i) => ({
+                date: new Date(base + i * oneDay).toISOString().split('T')[0],
+                close: 100 + Math.sin(i / 5) * 10,
+            })),
         ),
     }))
 })
@@ -92,15 +97,20 @@ describe('folioFlow library entry (index.js) — side-effect-free + public API',
 
     it('accepts injected adapters (DI)', async () => {
         const { FolioFlow } = require('./index')
+        const base = new Date('2025-01-01').getTime()
+        const oneDay = 24 * 60 * 60 * 1000
+        const bars = Array.from({ length: 200 }, (_, i) => ({
+            date: new Date(base + i * oneDay).toISOString().split('T')[0],
+            close: 100 + Math.sin(i / 5) * 10,
+        }))
         const mockYahoo = {
-            getHistoricalPrices: jest.fn().mockResolvedValue(
-                Array.from({ length: 200 }, (_, i) => 100 + Math.sin(i / 5) * 10),
-            ),
+            getHistoricalPrices: jest.fn().mockResolvedValue(bars),
         }
         const ff = new FolioFlow({ yahooFinance: mockYahoo })
         const result = await ff.getRSI('MSFT')
         expect(mockYahoo.getHistoricalPrices).toHaveBeenCalled()
         expect(result).toHaveProperty('symbol', 'MSFT')
+        expect(result).toHaveProperty('rsi_22_window')
     })
 
     it('folioFlow.version is a semver string', () => {
@@ -213,5 +223,7 @@ describe('src/cli.js — consumes FolioFlow (shared wiring)', () => {
         expect(logSpy).toHaveBeenCalledTimes(1)
         const parsed = JSON.parse(logSpy.mock.calls[0][0])
         expect(parsed).toHaveProperty('symbol', 'AAPL')
+        expect(parsed).toHaveProperty('generated_at')
+        expect(parsed).toHaveProperty('rsi_22_window')
     })
 })

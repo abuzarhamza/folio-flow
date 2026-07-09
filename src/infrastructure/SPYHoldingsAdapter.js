@@ -1,11 +1,25 @@
 const xlsx = require('xlsx')
 
+const JUNK_SYMBOLS = new Set(['-', '', 'null'])
+
 /**
  * Adapter to fetch and parse the State Street SPY holdings Excel file.
  */
 class SPYHoldingsAdapter {
     constructor() {
         this.url = 'https://www.ssga.com/us/en/intermediary/library-content/products/fund-data/etfs/us/holdings-daily-us-en-spy.xlsx'
+    }
+
+    /**
+     * Returns true if the value is a known-junk ticker (State Street's "-" marker,
+     * an empty cell, or the literal string "null" from a stringified-null data source).
+     * @param {*} value Raw cell value.
+     * @returns {boolean} True if the value should be filtered out as junk.
+     */
+    isJunkSymbol(value) {
+        if (value === null || value === undefined)
+            return true
+        return JUNK_SYMBOLS.has(String(value))
     }
 
     /**
@@ -53,8 +67,10 @@ class SPYHoldingsAdapter {
 
                 if (this.tickerIndex !== undefined && row[this.tickerIndex]) {
                     const symbol = String(row[this.tickerIndex]).trim()
+                    if (this.isJunkSymbol(symbol))
+                        continue
                     // Filter out rows that are not valid symbols (like cash totals)
-                    if (symbol && /^[A-Z-]+$/.test(symbol) && symbol !== 'TICKER') {
+                    if (/^[A-Z-]+$/.test(symbol) && symbol !== 'TICKER') {
                         symbols.push(symbol)
                     }
                 }

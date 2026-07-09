@@ -106,6 +106,40 @@ Executes the heavy chronological execution pipeline. This operation utilizes fix
 node index.js --batch-spy
 ```
 
+**Output file (`./spy_rsi_results.json`)**:
+A wrapped object with a `generated_at` ISO 8601 timestamp and the ticker results under `tickers`. Each row mirrors the single-symbol shape, including its own per-row `generated_at` and the three window date spans.
+```json
+{
+    "generated_at": "2026-07-05T14:23:45.678Z",
+    "tickers": [
+        {
+            "generated_at": "2026-07-05T14:23:45.678Z",
+            "symbol": "AAPL",
+            "rsi_22": 53.82,
+            "rsi_44": 55.67,
+            "rsi_66": 55.95,
+            "rsi_avg": 55.15,
+            "rsi_22_window": { "start_date": "2025-09-12", "end_date": "2026-07-08" },
+            "rsi_44_window": { "start_date": "2025-08-21", "end_date": "2026-07-08" },
+            "rsi_66_window": { "start_date": "2025-07-30", "end_date": "2026-07-08" }
+        }
+    ]
+}
+```
+
+**Querying the results (`search`)**:
+Once `spy_rsi_results.json` exists, query it without opening the file:
+```bash
+# Look up a single ticker's RSI
+node index.js search AAPL
+
+# Browse the top N tickers by rsi_avg (default 20)
+node index.js search --top 20
+node index.js search --top 5
+```
+
+Both modes return a wrapped `{ generated_at, tickers: [...] }` object on stdout. The `symbol` and `--top` flags are mutually exclusive.
+
 ### 4. Portfolio Plan
 Takes a JSON file describing the Trader's current portfolio and augments each row with a `signal` (buy / sell / hold) and a `reason` string, based on a momentum-based top-20 rule against the S&P 500.
 

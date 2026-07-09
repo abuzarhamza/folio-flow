@@ -13,11 +13,22 @@ Ubiquitous language for the FolioFlow module. This file is a glossary only — n
 - **Historical Prices** — A chronologically ordered series of daily closing prices for a Symbol, fetched from an external data provider. Used as the raw input to every RSI calculation.
 - **RSI (Relative Strength Index)** — A bounded momentum indicator in the range `[0, 100]` derived from Historical Prices over a fixed look-back Period. FolioFlow only ever reports the *current* (most recent) RSI value, never the whole series.
 - **Period** — The integer look-back length (number of trading days) used to compute one RSI. FolioFlow computes three Periods: **22, 44, 66**.
-- **RSI Result** — The composite output for a single Symbol. Contains the Symbol plus the current RSI for each configured Period. Shape (canonical, exactly as emitted on stdout):
+- **RSI Result** — The composite output for a single Symbol. Contains the Symbol, a `generated_at` ISO 8601 timestamp marking the moment the result was produced, the current RSI for each configured Period, the average of those current values, and one Window Descriptor per Period. Shape (canonical, exactly as emitted on stdout and on every row of `spy_rsi_results.json`):
   ```json
-  { "symbol": "AAPL", "rsi_22": 53.82, "rsi_44": 55.67, "rsi_66": 55.95 }
+  {
+    "generated_at": "2026-07-08T23:37:25.044Z",
+    "symbol": "AAPL",
+    "rsi_22": 53.82,
+    "rsi_44": 55.67,
+    "rsi_66": 55.95,
+    "rsi_avg": 55.15,
+    "rsi_22_window": { "start_date": "2025-09-12", "end_date": "2026-07-08" },
+    "rsi_44_window": { "start_date": "2025-08-21", "end_date": "2026-07-08" },
+    "rsi_66_window": { "start_date": "2025-07-30", "end_date": "2026-07-08" }
+  }
   ```
-- **RSI Average** — The arithmetic mean of the three configured RSI values for a Symbol. Reported by the library API; the CLI does not emit it.
+- **RSI Average** — The arithmetic mean of the three configured RSI values for a Symbol. Reported by both the CLI and the library API. Falls back to the mean of *available* values when one or more periods lack enough history.
+- **Window Descriptor** — A `{start_date, end_date}` pair attached to a Period, describing the span of bars that contributed to the emitted RSI. `start_date` is the date of the first bar on which the Period's RSI was computable (Wilder's warm-up = `period` bars from the start of the series). `end_date` is the date of the most recent bar in the series. `null` when the Period has no computable values (e.g. a stock younger than 22 trading days).
 - **SPY Holdings** — The set of Symbols that make up the S&P 500 index, as published by State Street in their official `.xlsx` spreadsheet. Treats as the canonical constituency list at sync time.
 - **Holdings Sync** — The act of fetching SPY Holdings from the State Street spreadsheet and persisting the Symbol list to `snp500.json` in the current working directory.
 - **Batch Run** — A sequential calculation of the RSI Result for every Symbol previously captured in `snp500.json`. Outputs to `spy_rsi_results.json`.

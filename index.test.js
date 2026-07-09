@@ -6,9 +6,14 @@ const snp500Path = path.join(PROJECT_ROOT, 'snp500.json')
 const resultsPath = path.join(PROJECT_ROOT, 'spy_rsi_results.json')
 
 jest.mock('./src/infrastructure/YahooFinanceAdapter', () => {
+    const base = new Date('2025-01-01').getTime()
+    const oneDay = 24 * 60 * 60 * 1000
     return jest.fn().mockImplementation(() => ({
         getHistoricalPrices: jest.fn().mockResolvedValue(
-            Array.from({ length: 200 }, (_, i) => 100 + Math.sin(i / 5) * 10),
+            Array.from({ length: 200 }, (_, i) => ({
+                date: new Date(base + i * oneDay).toISOString().split('T')[0],
+                close: 100 + Math.sin(i / 5) * 10,
+            })),
         ),
     }))
 })
@@ -128,11 +133,19 @@ describe('cLI handlers (cli.run) — happy paths via mocked adapters', () => {
         expect(logSpy).toHaveBeenCalledTimes(1)
         const parsed = JSON.parse(logSpy.mock.calls[0][0])
         expect(parsed).toHaveProperty('symbol', 'AAPL')
+        expect(parsed).toHaveProperty('generated_at')
         expect(parsed).toHaveProperty('rsi_22')
         expect(parsed).toHaveProperty('rsi_44')
         expect(parsed).toHaveProperty('rsi_66')
         expect(parsed).toHaveProperty('rsi_avg')
+        expect(parsed).toHaveProperty('rsi_22_window')
+        expect(parsed).toHaveProperty('rsi_44_window')
+        expect(parsed).toHaveProperty('rsi_66_window')
         expect(typeof parsed.rsi_22).toBe('number')
+        expect(typeof parsed.generated_at).toBe('string')
+        expect(new Date(parsed.generated_at).toString()).not.toBe('Invalid Date')
+        expect(parsed.rsi_22_window).toHaveProperty('start_date')
+        expect(parsed.rsi_22_window).toHaveProperty('end_date')
         logSpy.mockRestore()
     })
 
@@ -152,8 +165,9 @@ describe('cLI handlers (cli.run) — happy paths via mocked adapters', () => {
         await cli.run({ _: ['batch-spy'] })
         expect(fs.existsSync(resultsPath)).toBe(true)
         const results = JSON.parse(fs.readFileSync(resultsPath, 'utf8'))
-        expect(Array.isArray(results)).toBe(true)
-        expect(results.length).toBe(2)
+        expect(Array.isArray(results.tickers)).toBe(true)
+        expect(results.tickers.length).toBe(2)
+        expect(new Date(results.generated_at).toString()).not.toBe('Invalid Date')
 
         const lastCall = JSON.parse(logSpy.mock.calls[logSpy.mock.calls.length - 1][0])
         expect(lastCall).toMatchObject({ status: 'success', count: 2, file: 'spy_rsi_results.json' })

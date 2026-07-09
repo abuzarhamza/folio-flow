@@ -24,7 +24,7 @@ const parser = yargs(hideBin(process.argv))
     )
     .command(
         'batch-spy',
-        chalk.cyan('Calculate RSI for every ticker in snp500.json → spy_rsi_results.json.'),
+        chalk.cyan('Calculate the Relative Strength Index (RSI 22/44/66) for every ticker in snp500.json, with a per-ticker progress trace on stderr (~8 minutes). Results → spy_rsi_results.json.'),
     )
     .command(
         'plan <file>',
@@ -33,6 +33,20 @@ const parser = yargs(hideBin(process.argv))
             type: 'string',
             describe: 'Path to a Trader Portfolio JSON file',
         }),
+    )
+    .command(
+        'search [symbol]',
+        chalk.cyan('Look up a ticker in spy_rsi_results.json, or browse the top N by rsi_avg with --top.'),
+        y => y
+            .positional('symbol', {
+                type: 'string',
+                describe: 'Ticker symbol to look up (e.g. AAPL)',
+            })
+            .option('top', {
+                type: 'number',
+                describe: 'Browse the top N tickers by rsi_avg (default 20).',
+            })
+            .conflicts('symbol', 'top'),
     )
     .demandCommand(1, chalk.red('Error: a subcommand is required.'))
     .option('pretty', {
@@ -50,6 +64,11 @@ const parser = yargs(hideBin(process.argv))
             console.error(chalk.red(`Error: ${err.message}`))
         }
         else if (msg) {
+            const argvSoFar = process.argv.slice(2)
+            const command = argvSoFar.find(a => !a.startsWith('-'))
+            if (msg.includes('Not enough non-option arguments') && command === 'plan') {
+                msg = 'plan requires a <file> argument. Run `folioflow plan docs/example-portfolio.json` to try the worked example.'
+            }
             console.error(chalk.red(msg.startsWith('Error:') ? msg : `Error: ${msg}`))
         }
         process.exit(1)
